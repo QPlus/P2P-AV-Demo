@@ -38,3 +38,5 @@ P2P 功能模块，通过此模块所提供的接口和事件可以实现一套�
 ### 流程图如下： 
 
 ![流程图](https://github.com/QPlus/P2P-AV-Demo/raw/master/MDImages/p2p.png)
+
+### QQ 交流群： 202871487
