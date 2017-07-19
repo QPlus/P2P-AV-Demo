@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+    <meta name="viewport" content="maximum-scale=1.0,minimum-scale=1.0,user-scalable=0,width=device-width,initial-scale=1.0"/>
+    <meta name="format-detection" content="telephone=no,email=no,date=no,address=no">
+    <title>播放</title>
+    <link rel="stylesheet" type="text/css" href="../css/aui.css"/>
+    <link rel="stylesheet" type="text/css" href="../css/gotye.css"/>
+    <style>
+    	body{
+        	background:transparent;
+        }
+        
+    </style>
+</head>
+<body>
+	<div class="mask" tapmode onclick="resetmask();"></div>
+	<div class="console-other-btn" tapmode onclick="switchCamera();event.cancelBubble=true;">
+		<img src="../image/camera.png"/>
+	</div>
+	<div class="console-other-btn" style="right:100px" tapmode onclick="toggleMic();event.cancelBubble=true;">
+		<img src="../image/microphoneoff.png" id="micImg"/>
+	</div>
+		
+	<div class="viewer-count" tapmode onclick="showViewerList()">
+		<img src="../image/viewer.png" /><font id="viewerCount"></font>
+	</div>
+	<div class="viewer-list" id="viewerList"></div>
+		
+	<div class="p2p-cancel" id="p2pCancel" tapmode onclick="cancelP2P();event.cancelBubble=true;">取消连麦</div>
+	<div class="close-btn" tapmode onclick="closeAlert();event.cancelBubble=true;"><img class="btn-img" src="../image/close.png" /></div>
+</body>
+<script type="text/javascript" src="../script/api.js"></script>
+<script type="text/javascript" src="../script/jquery.min.js"></script>
+<script type="text/javascript">
+	var session={};
+	var rtcp2p;
+	var userListShow=false;
+	var micOn=true;
+	
+	apiready = function(){
+		//设置屏幕为全屏
+		api.setFullScreen({
+		    fullScreen: true
+		});
+		
+		//监听网络情况
+		api.addEventListener({
+		    name:'offline'
+		}, function(ret, err){        
+		    insertChartContent('sys','系统','网络异常！');
+		});		
+		api.addEventListener({
+		    name:'online'
+		}, function(ret, err){        
+		    insertChartContent('sys','系统','网络恢复！');
+		});
+		
+		api.parseTapmode();
+		
+		api.openFrame({
+		    name: 'remote_frm',
+		    url: '../html/remote_frm.html',
+		    rect:{
+		        x: api.frameWidth-130,
+                y: api.frameHeight-250,
+                w: 120,
+                h: 160
+		    },
+		    bounces: false,
+		    bgColor: 'rgba(0,0,0,0)',
+		    vScrollBarEnabled:false,
+		    hScrollBarEnabled:false
+		});
+		
+		//设置全局变量
+		session = {
+		    roomId: api.pageParam.roomId,
+		    password: api.pageParam.password,
+		    nickname: api.pageParam.nickname
+		};
+
+        rtcp2p = api.require('RTCP2P');
+        
+        //初始化
+		rtcp2p.init({session:session});
+
+		//各种监听
+		rtcp2p.addEventListener({name: 'connected'}, function(ret,err) {
+			api.toast({msg:"p2p connected"})
+		});
+        rtcp2p.addEventListener({name: 'disconnected'}, function(ret,err) {
+        	api.toast({msg:"p2p disconnected"})
+    	});
+        rtcp2p.addEventListener({name: 'error'}, function(ret,err) {
+        	api.toast({msg:"p2p error"})
+    	});
+        rtcp2p.addEventListener({name: 'acceptCall'}, function(ret, err) {
+        	api.toast({msg:JSON.stringify(ret)});
+        });
+        rtcp2p.addEventListener({name: 'denyCall'}, function(ret, err) {
+        	api.toast({msg:"denyCall"});
+        });
+        rtcp2p.addEventListener({name: 'endCall'}, function(ret, err) {
+            api.toast({msg:"endCall"});
+        });
+
+        rtcp2p.addEventListener({name: 'inviteCall'}, function(ret, err) {
+            api.toast({msg:'收到连麦邀请'});
+            inviteCall(ret.sendId,ret.sendName)
+        });
+
+        rtcp2p.addEventListener({name: 'sentAcceptCall'}, function(ret, err) {
+            api.toast({msg:'发送连麦邀请'});
+        });
+
+		//登录
+		rtcp2p.login(function(ret, err) {
+		    if (err) {
+		    	alert('登录失败：'+err.description);
+		        close();
+		    } else {			    			  
+				setTimeout(function() {
+		            initUserList()
+		        },
+		        1000);
+		    }
+		});		
+		
+		
+	};		
+	
+	//获取观众列表信息
+	function initUserList(){
+		 rtcp2p.queryUserList({index:1,total:20},function(ret, err) {
+		    if( err ){
+		    	api.toast({
+	                msg:'获取用户列表失败'
+                });
+		    }else{		
+		    	$('#viewerCount').text(ret.total);   
+		    	var ht_user='';      	    	
+		    	for(var i=0;i<ret.entities.length;i++){
+		    	 	ht_user+=
+		    	 		'<div class="viewer-list-item aui-ellipsis-1" data-account="'+ret.entities[i].account+'" tapmode onclick="onUserClick(this);event.cancelBubble=true;">'+ret.entities[i].nickname+'</div>';    	 	
+		    	}
+		    	$('#viewerList').html(ht_user);
+		    	 
+ 			    rtcp2p.setRendererView({
+					localView:{
+						fixedOn:'p2p_frm'
+					},
+					remoteView:{
+						fixedOn:'remote_frm'
+					}
+				});
+		    }
+		});
+	}
+	
+	//清除房间验证信息，销毁session实例。退出直播间时调用
+	function destroyRoomSession(){		
+		var core = api.require('RTCCore');;
+		core.destroyRoomSession(session);
+	}
+	
+	function closeAlert(){
+		var dialogBox = api.require('dialogBox');
+		dialogBox.alert({
+		    texts: {
+		        content: '确定要退出连麦？',
+		        leftBtnTitle: '退出',
+		        rightBtnTitle: '取消'
+		    },
+		    styles: {
+		        bg: 'rgba(0,0,0,0.5)',
+		        corner: 5,
+		        w: 230,
+		        content: {
+		            color: '#FFFFFF',
+		            size: 14
+		        },
+		        left: {
+		            marginB: 15,
+		            marginL: 10,
+		            w: 80,
+		            h: 30,
+		            corner: 5,
+		            bg: '#9F61E8',
+		            color: '#FFFFFF',
+		            size: 12
+		        },
+		        right: {
+		            marginB: 15,
+		            marginL: 50,
+		            w: 80,
+		            h: 30,
+		            corner: 5,
+		            bg: '#DDDDDD',
+		            color: '#999999',
+		            size: 12
+		        }
+		    }
+		}, function(ret) {
+		    if (ret.eventType == 'left') {
+		        dialogBox.close({
+		            dialogName: 'alert'
+		        });
+		        close();
+		    }else if (ret.eventType == 'right') {
+		        dialogBox.close({
+		            dialogName: 'alert'
+		        });
+		    }
+		});
+	}
+
+	function close(){
+		api.setFullScreen({
+		    fullScreen: false
+		});
+		endPeerConnection();
+		destroyRoomSession();
+		api.closeWin({
+        });
+	}
+	
+	
+	
+	function showViewerList(){
+		 if(!userListShow){
+			 $('#viewerList').show();
+		 	 userListShow=true;
+		 }else{
+			 $('#viewerList').hide();
+		 	 userListShow=false;
+		 }				 
+	}
+	
+	function hideViewerList(){
+		$('#viewerList').hide();
+		userListShow=false;
+	}
+	
+	
+	function showConsole(){
+		$('#consoleMain').hide();
+		$('#consoleMain').css('background','transparent');
+		if(!publishOn)
+			$('#consoleMainBtn').css('background','#56B363');
+		else
+			$('#consoleMainBtn').css('background','#C76B5C');
+		$('#console').show();
+	}
+	
+	function hideConsole(){
+		$('#consoleMain').show();
+		$('#consoleMain').css('background','transparent');
+		$('#consoleMainBtn').css('background','#FFFFFF');
+		$('#console').hide();
+	}
+
+	//设置前后摄像头
+	function switchCamera(){
+		rtcp2p.switchCamera();
+	}
+	
+	//设置麦克风
+	function toggleMic(){
+		rtcp2p.toggleMic();
+		if(micOn){
+			$('#micImg').attr('src','../image/microphoneon.png');
+			micOn=false;
+			api.toast({
+	            msg:'麦克风已关闭'
+            });
+		}else{
+			$('#micImg').attr('src','../image/microphoneoff.png');
+			micOn=true;
+			api.toast({
+	            msg:'麦克风已打开'
+            });
+		}
+	}
+	
+	function resetmask(){
+		$('#chartInput').blur();
+
+		//观看人
+		hideViewerList();
+		//主控按钮
+		hideConsole();
+	}
+	
+
+	function onUserClick(tag){
+		var dialogBox = api.require('dialogBox');
+		dialogBox.alert({
+		    texts: {
+		        content: $(tag).text(),
+		        leftBtnTitle: '连麦',
+		        rightBtnTitle: '取消'
+		    },
+		    styles: {
+		        bg: 'rgba(0,0,0,0.5)',
+		        corner: 5,
+		        w: 230,
+		        content: {
+		            color: '#FFFFFF',
+		            size: 14
+		        },
+		        left: {
+		            marginB: 15,
+		            marginL: 10,
+		            w: 80,
+		            h: 30,
+		            corner: 5,
+		            bg: '#9F61E8',
+		            color: '#FFFFFF',
+		            size: 12
+		        },
+		        right: {
+		            marginB: 15,
+		            marginL: 50,
+		            w: 80,
+		            h: 30,
+		            corner: 5,
+		            bg: '#DDDDDD',
+		            color: '#999999',
+		            size: 12
+		        }
+		    }
+		}, function(ret) {
+		    if (ret.eventType == 'left') {
+		    	inviteUser(tag);
+		        dialogBox.close({
+		            dialogName: 'alert'
+		        });
+		    }else if (ret.eventType == 'right') {
+		        dialogBox.close({
+		            dialogName: 'alert'
+		        });
+		    }
+		});
+	}
+	
+	//打开连麦请求提示
+	function inviteCall(sendId,sendName){
+		var dialogBox = api.require('dialogBox');
+		dialogBox.alert({
+		    texts: {
+		        content: sendName+'邀请您连麦是否接受？',
+		        leftBtnTitle: '接受',
+		        rightBtnTitle: '拒绝'
+		    },
+		    styles: {
+		        bg: 'rgba(0,0,0,0.5)',
+		        corner: 5,
+		        w: 230,
+		        content: {
+		            color: '#FFFFFF',
+		            size: 14
+		        },
+		        left: {
+		            marginB: 15,
+		            marginL: 10,
+		            w: 80,
+		            h: 30,
+		            corner: 5,
+		            bg: '#9F61E8',
+		            color: '#FFFFFF',
+		            size: 12
+		        },
+		        right: {
+		            marginB: 15,
+		            marginL: 50,
+		            w: 80,
+		            h: 30,
+		            corner: 5,
+		            bg: '#DDDDDD',
+		            color: '#999999',
+		            size: 12
+		        }
+		    }
+		}, function(ret) {
+		    if (ret.eventType == 'left') {	
+		    	rtcp2p.acceptInvitation();
+				dialogBox.close({
+		            dialogName: 'alert'
+		        });
+		    }else if (ret.eventType == 'right') {
+		        rtcp2p.denyInvitation();
+				dialogBox.close({
+		            dialogName: 'alert'
+		        });
+		    }
+		});
+	}
+	
+	function inviteUser(tag){
+		var account=$(tag).attr('data-account');
+		rtcp2p.inviteUser({
+			account:account
+		});
+	}
+		
+	//取消连麦
+	function endPeerConnection(){
+		rtcp2p.endPeerConnection();
+	}
+</script>
+</html>

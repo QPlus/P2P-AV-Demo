@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+    <meta name="viewport" content="maximum-scale=1.0,minimum-scale=1.0,user-scalable=0,width=device-width,initial-scale=1.0"/>
+    <meta name="format-detection" content="telephone=no,email=no,date=no,address=no">
+    <title>播放</title>
+    <link rel="stylesheet" type="text/css" href="../css/aui.css"/>
+    <link rel="stylesheet" type="text/css" href="../css/gotye.css"/>
+    <style>
+    	body{
+        	background:transparent;
+        }
+        
+    </style>
+</head>
+<body>
+	<div class="mask" tapmode onclick="resetmask();"></div>
+	<div class="viewer-count"><img src="../image/viewer.png" /><font id="viewerCount"></font></div>
+	<div class="viewer-list-btn" id="viewerListBtn" tapmode onclick="showViewerList();event.cancelBubble=true;"><i class="aui-iconfont aui-icon-menu"></i></div>	
+	<div class="viewer-list" id="viewerList"></div>
+		
+	<div class="p2p-cancel" id="p2pCancel" tapmode onclick="cancelP2P();event.cancelBubble=true;">取消连麦</div>
+	
+	<img class="console-main" id="consoleMain" src="../image/publisher/hexagon.png" style="background: transparent;left:0;border: none;" tapmode onclick="showConsole();event.cancelBubble=true;"/>
+	<div class="console" id="console">	
+		<div class="console-main" id="consoleMain"><div class="console-main-btn" id="consoleMainBtn" tapmode onclick="startPublisher(this);event.cancelBubble=true;"></div></div>	
+		<div class="console-other-btn" tapmode onclick="switchCamera();event.cancelBubble=true;">
+			<img src="../image/publisher/camera.png"/>
+		</div>
+		<div class="console-other-btn" style="margin-top: 15px;margin-left: 45px;" tapmode onclick="share();event.cancelBubble=true;">
+			<img src="../image/publisher/share.png"/>
+		</div>
+		<div class="console-other-btn" style="margin-top: 60px;margin-left: 60px;" tapmode onclick="setScreen();event.cancelBubble=true;">
+			<img src="../image/publisher/screen.png"/>
+		</div>
+		<div class="console-other-btn" style="margin-top: 105px;margin-left: 45px;" tapmode onclick="setTorch();event.cancelBubble=true;">
+			<img id="torchImg" src="../image/publisher/torchoff.png"/>
+		</div>
+		<div class="console-other-btn" style="margin-top: 115px;" tapmode onclick="setFilter();event.cancelBubble=true;">
+			<img id="filterImg" src="../image/publisher/filteroff.png"/>
+		</div>
+	</div>
+</body>
+<script type="text/javascript" src="../script/api.js"></script>
+<script type="text/javascript" src="../script/jquery.min.js"></script>
+<script type="text/javascript">
+	var session={};
+	var rtcp2p;
+	var localId,remoteId;
+	
+	apiready = function(){
+		//设置屏幕为全屏
+		api.setFullScreen({
+		    fullScreen: true
+		});
+		
+		//监听网络情况
+		api.addEventListener({
+		    name:'offline'
+		}, function(ret, err){        
+		    insertChartContent('sys','系统','网络异常！');
+		});		
+		api.addEventListener({
+		    name:'online'
+		}, function(ret, err){        
+		    insertChartContent('sys','系统','网络恢复！');
+		});
+		
+		api.parseTapmode();
+		
+		api.openFrame({
+		    name: 'remote',
+		    url: '../html/remote.html',
+		    rect:{
+		        x: api.frameWidth-130,
+                y: api.frameHeight-250,
+                w: 120,
+                h: 160
+		    },
+		    bounces: false,
+		    bgColor: 'rgba(0,0,0,0)',
+		    vScrollBarEnabled:false,
+		    hScrollBarEnabled:false
+		});
+		
+		//设置全局变量
+		session = {
+		    roomId: api.pageParam.roomId,
+		    password: api.pageParam.password,
+		    nickname: api.pageParam.nickname
+		};
+
+        rtcp2p = api.require('RTCP2P');
+        
+        //初始化
+		rtcp2p.init({session:session});
+
+		rtcp2p.addEventListener({name: 'connected'}, function(ret,err) {api.toast({msg:"p2p connected"})});
+        rtcp2p.addEventListener({name: 'disconnected'}, function(ret,err) {api.toast({msg:"p2p disconnected"})});
+        rtcp2p.addEventListener({name: 'error'}, function(ret,err) {api.toast({msg:"p2p error"})});
+
+        rtcp2p.addEventListener({name: 'acceptCall'}, function(ret, err) {
+                                        api.toast({msg:JSON.stringify(ret)});
+                                       });
+        rtcp2p.addEventListener({name: 'denyCall'}, function(ret, err) {
+                                        //api.toast({msg:JSON.stringify(ret)});
+                                        api.toast({msg:"denyCall"});
+                                       });
+        rtcp2p.addEventListener({name: 'endCall'}, function(ret, err) {
+                                        api.toast({msg:"endCall"});
+                                       });
+
+        rtcp2p.addEventListener({name: 'inviteCall'}, function(ret, err) {
+                                        api.toast({msg:JSON.stringify(ret)});
+                                        var sentid = ret.sendId;
+                                        //p2p.acceptInvitation();
+                                        //p2p.denyInvitation();
+                                   });
+
+        rtcp2p.addEventListener({name: 'sentAcceptCall'}, function(ret, err) {
+                                        api.toast({msg:JSON.stringify(ret)});
+                                        //p2p.endPeerConnection();
+                                   });
+
+		//登录
+		rtcp2p.login(function(ret, err) {
+		    if (err) {
+		    	alert('登录失败：'+err.description);
+		        close();
+		    } else {
+			    initUserList();
+			    
+			    rtcp2p.setRendererView({
+					localView:{
+						fixedOn:'p2p'
+					},
+					remoteView:{
+						fixedOn:'remote'
+					}
+				});
+		    }
+		});		
+		
+		
+	};		
+	
+	//获取观众列表信息
+	function initUserList(){
+		 rtcp2p.queryUserList({index:1,total:20},function(ret, err) {
+		    if( err ){
+		    	alert( JSON.stringify( err ) );
+		    }else{
+		         alert( JSON.stringify( ret ) );
+		         var ht_user='<div class="viewer-list-item aui-ellipsis-1 aui-padded-l-15"><img class="crown" src="../image/publisher/crown.png" />主播</div>';		    	
+		    	 for(var i=0;i<ret.entities.length;i++){
+		    	 	ht_user+=
+		    	 		'<div class="viewer-list-item aui-ellipsis-1" data-account="'+ret.entities[i].account+'" tapmode onclick="onUserClick(this);event.cancelBubble=true;">'+ret.entities[i].nickname+'</div>';    	 	
+		    	 }
+		    	 $('#viewerList').html(ht_user);
+		    }
+		});
+	}
+	
+	//清除房间验证信息，销毁session实例。退出直播间时调用
+	function destroyRoomSession(){		
+		var core = api.require('RTCCore');;
+		core.destroyRoomSession(session);
+	}
+	
+	function closeAlert(){
+		var dialogBox = api.require('dialogBox');
+		dialogBox.alert({
+		    texts: {
+		        content: '确定要退出直播？',
+		        leftBtnTitle: '退出',
+		        rightBtnTitle: '取消'
+		    },
+		    styles: {
+		        bg: 'rgba(0,0,0,0.5)',
+		        corner: 5,
+		        w: 230,
+		        content: {
+		            color: '#FFFFFF',
+		            size: 14
+		        },
+		        left: {
+		            marginB: 15,
+		            marginL: 10,
+		            w: 80,
+		            h: 30,
+		            corner: 5,
+		            bg: '#9F61E8',
+		            color: '#FFFFFF',
+		            size: 12
+		        },
+		        right: {
+		            marginB: 15,
+		            marginL: 50,
+		            w: 80,
+		            h: 30,
+		            corner: 5,
+		            bg: '#DDDDDD',
+		            color: '#999999',
+		            size: 12
+		        }
+		    }
+		}, function(ret) {
+		    if (ret.eventType == 'left') {
+		        dialogBox.close({
+		            dialogName: 'alert'
+		        });
+		        close();
+		    }else if (ret.eventType == 'right') {
+		        dialogBox.close({
+		            dialogName: 'alert'
+		        });
+		    }
+		});
+	}
+
+	function close(){
+		api.setFullScreen({
+		    fullScreen: false
+		});
+
+		destroyRoomSession();
+		api.closeFrame({
+			name: 'p2p'
+        });
+        api.closeFrame({
+			name: 'p2p_mask'
+        });
+	}
+	
+	
+	
+	function showViewerList(){
+		$('#viewerListBtn').hide();
+		setTimeout(function() {
+            $('#viewerList').show()
+        },
+        300)
+	}
+	
+	function hideViewerList(){
+		$('#viewerListBtn').show();
+		$('#viewerList').hide();
+	}
+	
+	
+	function showConsole(){
+		$('#consoleMain').hide();
+		$('#consoleMain').css('background','transparent');
+		if(!publishOn)
+			$('#consoleMainBtn').css('background','#56B363');
+		else
+			$('#consoleMainBtn').css('background','#C76B5C');
+		$('#console').show();
+	}
+	
+	function hideConsole(){
+		$('#consoleMain').show();
+		$('#consoleMain').css('background','transparent');
+		$('#consoleMainBtn').css('background','#FFFFFF');
+		$('#console').hide();
+	}
+
+	//设置前后摄像头
+	function switchCamera(){
+		publisher.switchCamera();
+	}
+	
+
+	
+	function resetmask(){
+		$('#chartInput').blur();
+
+		//观看人
+		hideViewerList();
+		//主控按钮
+		hideConsole();
+	}
+	
+
+	function onUserClick(tag){
+		var dialogBox = api.require('dialogBox');
+		dialogBox.alert({
+		    texts: {
+		        content: $(tag).text(),
+		        leftBtnTitle: '连麦',
+		        rightBtnTitle: '取消'
+		    },
+		    styles: {
+		        bg: 'rgba(0,0,0,0.5)',
+		        corner: 5,
+		        w: 230,
+		        content: {
+		            color: '#FFFFFF',
+		            size: 14
+		        },
+		        left: {
+		            marginB: 15,
+		            marginL: 10,
+		            w: 80,
+		            h: 30,
+		            corner: 5,
+		            bg: '#9F61E8',
+		            color: '#FFFFFF',
+		            size: 12
+		        },
+		        right: {
+		            marginB: 15,
+		            marginL: 50,
+		            w: 80,
+		            h: 30,
+		            corner: 5,
+		            bg: '#DDDDDD',
+		            color: '#999999',
+		            size: 12
+		        }
+		    }
+		}, function(ret) {
+		    if (ret.eventType == 'left') {
+		    	inviteUser(tag);
+		        dialogBox.close({
+		            dialogName: 'alert'
+		        });
+		    }else if (ret.eventType == 'right') {
+		        dialogBox.close({
+		            dialogName: 'alert'
+		        });
+		    }
+		});
+	}
+	
+	function inviteUser(tag){
+		var account=$(tag).attr('data-account');
+		rtcp2p.inviteUser();
+	}
+		
+	//取消连麦
+	function endPeerConnection(){
+		rtcp2p.endPeerConnection();
+	}
+</script>
+</html>
