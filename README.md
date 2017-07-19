@@ -35,6 +35,6 @@ P2P 功能模块，通过此模块所提供的接口和事件可以实现一套�
 5. 建立连接 OR 结束互动  
 当收到acceptCall事件后，就会开始建立连接，连接成功后会收到connected事件。如果希望结束互动可以调用endPeerConnection函数  
 
-###流程图如下：
+### 流程图如下： 
 
 ![流程图](https://github.com/QPlus/P2P-AV-Demo/raw/master/MDImages/p2p.png)
