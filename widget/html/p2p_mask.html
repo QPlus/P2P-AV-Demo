@@ -121,10 +121,11 @@
 		    	alert('登录失败：'+err.description);
 		        close();
 		    } else {			    			  
-				setTimeout(function() {
-		            initUserList()
-		        },
-		        1000);
+				// setTimeout(function() {
+		  //           initUserList()
+		  //       },
+		  //       1000);
+		  		setInterval("initUserList()",1000*6);
 
 		        rtcp2p.setRendererView({
 					localView:{
