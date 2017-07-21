@@ -45,20 +45,6 @@
 		    fullScreen: true
 		});
 		
-		//监听网络情况
-		api.addEventListener({
-		    name:'offline'
-		}, function(ret, err){        
-		    insertChartContent('sys','系统','网络异常！');
-		});		
-		api.addEventListener({
-		    name:'online'
-		}, function(ret, err){        
-		    insertChartContent('sys','系统','网络恢复！');
-		});
-		
-		api.parseTapmode();
-		
 		api.openFrame({
 		    name: 'remote_frm',
 		    url: '../html/remote_frm.html',
@@ -73,6 +59,20 @@
 		    vScrollBarEnabled:false,
 		    hScrollBarEnabled:false
 		});
+				
+		//监听网络情况
+		api.addEventListener({
+		    name:'offline'
+		}, function(ret, err){        
+		    insertChartContent('sys','系统','网络异常！');
+		});		
+		api.addEventListener({
+		    name:'online'
+		}, function(ret, err){        
+		    insertChartContent('sys','系统','网络恢复！');
+		});
+		
+		api.parseTapmode();
 		
 		//设置全局变量
 		session = {
@@ -97,7 +97,7 @@
         	api.toast({msg:"p2p error"})
     	});
         rtcp2p.addEventListener({name: 'acceptCall'}, function(ret, err) {
-        	api.toast({msg:JSON.stringify(ret)});
+        	api.toast({msg:'接受连麦邀请！'});        	
         });
         rtcp2p.addEventListener({name: 'denyCall'}, function(ret, err) {
         	api.toast({msg:"denyCall"});
@@ -125,14 +125,14 @@
 		  //           initUserList()
 		  //       },
 		  //       1000);
-		  		setInterval("initUserList()",1000*6);
+		  		setInterval("initUserList()",1000*2);
 
 		        rtcp2p.setRendererView({
 					localView:{
-						fixedOn:'p2p_frm'
+						fixedOn:'remote_frm'
 					},
 					remoteView:{
-						fixedOn:'remote_frm'
+						fixedOn:'p2p_frm'
 					}
 				});
 		    }
@@ -153,7 +153,7 @@
 		    	var ht_user='';      	    	
 		    	for(var i=0;i<ret.entities.length;i++){
 		    	 	ht_user+=
-		    	 		'<div class="viewer-list-item aui-ellipsis-1" data-account="'+ret.entities[i].account+'" tapmode onclick="onUserClick(this);event.cancelBubble=true;">'+ret.entities[i].nickname+'</div>';    	 	
+		    	 		'<div class="viewer-list-item aui-ellipsis-1" data-account="'+ret.entities[i].account+'" tapmode onclick="onUserClick(this);event.cancelBubble=true;">'+ret.entities[i].nickname+'--'+ret.entities[i].account+'</div>';    	 	
 		    	}
 		    	$('#viewerList').html(ht_user);
 		    	 
@@ -235,6 +235,7 @@
 		 if(!userListShow){
 			 $('#viewerList').show();
 		 	 userListShow=true;
+		 	 initUserList();
 		 }else{
 			 $('#viewerList').hide();
 		 	 userListShow=false;
