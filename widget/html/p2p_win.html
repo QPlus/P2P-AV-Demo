@@ -73,7 +73,7 @@
 	
 	//获取观众列表信息
 	function initUserList(){
-		 rtcp2p.queryUserList({index:1,total:20},function(ret, err) {
+		 rtcp2p.queryUserList({index:0,total:20},function(ret, err) {
 		    if( err ){
 		    	api.toast({
 	                msg:'获取用户列表失败'
