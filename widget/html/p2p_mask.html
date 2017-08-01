@@ -81,7 +81,7 @@
 		    nickname: api.pageParam.nickname
 		};
 
-        rtcp2p = api.require('RTCP2P');
+        rtcp2p = api.require('rtcP2P');
         
         //初始化
 		rtcp2p.init({session:session});
@@ -164,7 +164,7 @@
 	
 	//清除房间验证信息，销毁session实例。退出直播间时调用
 	function destroyRoomSession(){		
-		var core = api.require('RTCCore');;
+		var core = api.require('rtcCore');;
 		core.destroyRoomSession(session);
 	}
 	
