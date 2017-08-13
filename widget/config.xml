@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<widget id="A6055893225784" version="0.0.1"> 
+<widget id="A6055907256169" version="0.0.1"> 
   <name>亲加连麦</name>  
   <description/>  
   <author email="haofei@gotye.com.cn" href="http://www.gotye.com.cn">RiceBeanDaddy</author>  
@@ -16,7 +16,7 @@
   <permission name="location"/>  
   <permission name="internet"/>  
   <access origin="*"/>  
-  <feature name="RTCCore"> 
+  <feature name="rtcCore"> 
     <param name="appKey" value="396cdccde9ea44f2a9da53ecc8b1c212"/>  
     <param name="accessSecret" value="5404c692741047ac99420b23dbc0e047"/> 
   </feature> 
